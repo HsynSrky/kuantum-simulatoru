@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kuantum Ruhu Simülatörü</title>
+    <style>
+      html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
+      canvas { display: block; }
+      :root {
+        --panel-bg: rgba(255,255,255,0.06);
+        --panel-border: rgba(255,255,255,0.14);
+        --muted: rgba(255,255,255,0.78);
+        --text: rgba(255,255,255,0.93);
+        --btn-bg: rgba(255,255,255,0.09);
+        --btn-bg-hover: rgba(255,255,255,0.14);
+        --btn-border: rgba(255,255,255,0.18);
+      }
+      #ui {
+        position: fixed;
+        left: 16px;
+        top: 16px;
+        z-index: 10;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        color: var(--text);
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 12px;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        width: 320px;
+        max-height: calc(100vh - 32px);
+        overflow: auto;
+        box-shadow: 0 12px 48px rgba(0,0,0,0.55);
+      }
+      #ui .row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+      #ui button {
+        appearance: none;
+        border: 1px solid var(--btn-border);
+        background: var(--btn-bg);
+        color: rgba(255,255,255,0.96);
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        letter-spacing: 0.5px;
+      }
+      #ui button:hover { background: var(--btn-bg-hover); }
+      #ui button:active { transform: translateY(1px); }
+      #ui button:disabled { opacity: 0.45; cursor: not-allowed; }
+      #ui label { font-size: 12px; opacity: 0.88; color: var(--muted); }
+      #ui input[type="range"] { width: 100%; }
+      #zValue { font-variant-numeric: tabular-nums; opacity: 0.9; }
+      #ui select {
+        background: rgba(0,0,0,0.22);
+        color: rgba(255,255,255,0.95);
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 10px;
+        padding: 8px 10px;
+        outline: none;
+      }
+      #ui select:focus { border-color: rgba(41,182,246,0.7); }
+      #ui input[type="range"] { accent-color: #29b6f6; }
+      #ui input[type="checkbox"] { accent-color: #29b6f6; }
+      #sandbox {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255,255,255,0.12);
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 999px;
+        background: rgba(255,255,255,0.06);
+        cursor: grab;
+        user-select: none;
+      }
+      #circuitArea {
+        border: 1px dashed rgba(255,255,255,0.25);
+        border-radius: 12px;
+        padding: 10px;
+        min-height: 68px;
+        background: rgba(0,0,0,0.15);
+        color: rgba(255,255,255,0.82);
+      }
+      #steps { margin-top: 8px; font-size: 12px; opacity: 0.9; }
+      #steps .step { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+      #steps .step select, #steps .step input {
+        background: rgba(0,0,0,0.2);
+        color: rgba(255,255,255,0.95);
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 10px;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+      #steps .step button { padding: 6px 10px; font-size: 12px; }
+      #sandboxControls button { width: 100%; }
+      input[type="color"] { width: 100%; height: 34px; padding: 0; border: 0; background: transparent; }
+      textarea {
+        width: 100%;
+        min-height: 62px;
+        resize: vertical;
+        background: rgba(0,0,0,0.22);
+        color: rgba(255,255,255,0.92);
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 10px;
+        padding: 8px;
+        box-sizing: border-box;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 11px;
+      }
+
+      #menuBtn {
+        position: fixed;
+        right: 16px;
+        top: 16px;
+        z-index: 12;
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        border: 1px solid var(--panel-border);
+        background: rgba(255,255,255,0.06);
+        color: rgba(255,255,255,0.92);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        cursor: pointer;
+        box-shadow: 0 12px 48px rgba(0,0,0,0.55);
+      }
+      #menuBtn:hover { background: rgba(255,255,255,0.1); }
+
+      #drawerOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 11;
+        background: rgba(0,0,0,0.55);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 160ms ease;
+      }
+      #drawer {
+        position: fixed;
+        right: 0;
+        top: 0;
+        height: 100vh;
+        width: min(420px, 92vw);
+        z-index: 12;
+        background: rgba(10,10,14,0.86);
+        border-left: 1px solid rgba(255,255,255,0.14);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        transform: translateX(110%);
+        transition: transform 220ms ease;
+        color: rgba(255,255,255,0.92);
+        box-shadow: -24px 0 70px rgba(0,0,0,0.55);
+        display: flex;
+        flex-direction: column;
+      }
+      #drawerHeader {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 14px 12px 14px;
+        border-bottom: 1px solid rgba(255,255,255,0.12);
+      }
+      #drawerHeader h2 {
+        margin: 0;
+        font-size: 14px;
+        letter-spacing: 0.3px;
+      }
+      #drawerClose {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.16);
+        background: rgba(255,255,255,0.06);
+        color: rgba(255,255,255,0.9);
+        cursor: pointer;
+      }
+      #drawerClose:hover { background: rgba(255,255,255,0.1); }
+      #drawerBody {
+        padding: 14px;
+        overflow: auto;
+        line-height: 1.45;
+        font-size: 13px;
+      }
+      #drawerBody h3 {
+        margin: 14px 0 8px 0;
+        font-size: 13px;
+      }
+      #drawerBody p { margin: 8px 0; color: rgba(255,255,255,0.86); }
+      #drawerBody ul { margin: 8px 0 10px 18px; padding: 0; }
+      #drawerBody li { margin: 6px 0; }
+      #drawerBody code {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.12);
+        padding: 1px 6px;
+        border-radius: 8px;
+        font-size: 12px;
+      }
+      body.drawer-open #drawerOverlay { opacity: 1; pointer-events: auto; }
+      body.drawer-open #drawer { transform: translateX(0); }
+
+      @media (max-width: 520px) {
+        #ui { left: 10px; top: 10px; width: min(92vw, 360px); max-height: calc(100vh - 20px); }
+        #menuBtn { right: 10px; top: 10px; }
+        #ui .row { flex-wrap: wrap; }
+      }
+    </style>
+  </head>
+  <body>
+    <button id="menuBtn" type="button" aria-label="Menü">≡</button>
+    <div id="drawerOverlay"></div>
+    <aside id="drawer" aria-hidden="true">
+      <div id="drawerHeader">
+        <h2>Kullanım Kılavuzu</h2>
+        <button id="drawerClose" type="button" aria-label="Kapat">✕</button>
+      </div>
+      <div id="drawerBody">
+        <p>Bu simülatör, kuantum kavramlarını görselleştirerek öğretmek için tasarlandı. Bu sürümde kapılar (H/X/Z/C-X) gerçek bir <strong>state-vector</strong> (kompleks genlik) modeli üzerinde çalışır. Ölçüm <strong>Born kuralı</strong> ile yapılır.</p>
+
+        <h3>1) Sahne ve Nesneler</h3>
+        <ul>
+          <li><code>Olasılık Küresi</code>: Süperpozisyon halini temsil eden yarı saydam, parıldayan qubit.</li>
+          <li><code>Çöküş Olayı</code>: Ölçüm anında qubit’in aniden <code>0</code> (siyah) veya <code>1</code> (beyaz) olması.</li>
+          <li><code>Kader Bağı</code>: Dolaşıklık varken iki qubit arasında ince titreşen çizgi.</li>
+        </ul>
+
+        <h3>2) Aktif Qubit ve Kapılar (H / X / Z)</h3>
+        <ul>
+          <li><code>Aktif</code> seçimi: H/X/Z hangi qubit’e uygulanacaksa onu belirler.</li>
+          <li><code>H</code> (Hadamard): Qubit’e unitary dönüşüm uygular; süperpozisyon ve interferans davranışı gerçek genliklerle hesaplanır.</li>
+          <li><code>X</code> (NOT): <code>|0⟩</code> ve <code>|1⟩</code> bileşenlerini swap eder (unitary).</li>
+          <li><code>Z</code> (Faz): UI’daki derece değeri, qubit üzerinde gerçek bir <code>Z(θ)</code> faz dönüşümü uygular. Tek başına olasılığı değiştirmez; interferans devrelerinde etkisi görünür.</li>
+        </ul>
+
+        <h3>3) Ölçüm</h3>
+        <ul>
+          <li>Qubit’i <strong>tıklayarak</strong> ölçersin. Ölçüm her zaman yapılabilir; klasik halde sonuç deterministiktir.</li>
+          <li>Ölçüm anı keskin ve anlıktır; tween yoktur. Ölçüm sonrası durum normalize edilir.</li>
+        </ul>
+
+        <h3>4) C-X (CNOT)</h3>
+        <ul>
+          <li><code>C-X</code>: Kontrol qubit <code>1</code> ise hedefe X uygular; kontrol <code>0</code> ise hiçbir şey yapmaz.</li>
+          <li>Kontrol süperpozisyondayken de çalışır ve dolaşıklık yaratabilir (state-vector tabanlı).</li>
+        </ul>
+
+        <h3>5) Dolaşıklık Yarat (Bell)</h3>
+        <ul>
+          <li><code>Dolaşıklık Yarat</code> sırasıyla: reset → A’ya H → kısa bekleme → CNOT(A→B).</li>
+          <li>Bell durumu gerçekten register üzerinde üretilir. <code>Kader Bağı</code> çizgisi, dolaşıklık tespit edilince görünür.</li>
+          <li>Bell durumunda ölçümler korelasyonludur; ölçümün diğer qubit’e etkisi state-vector collapse ile ortaya çıkar.</li>
+        </ul>
+
+        <h3>6) Gizemli Kutu + Deutsch</h3>
+        <ul>
+          <li>Bir <code>Kutu</code> seç: kutu içindeki devre bir “oracle” gibi davranır.</li>
+          <li><code>Kuantum Sorgusu Yap</code> otomatik akışı çalıştırır ve sonucu yalnızca A’dan okur.</li>
+          <li>Sonuç <code>0</code> ise kutu <strong>SABİT</strong>, sonuç <code>1</code> ise kutu <strong>DENGELİ</strong> yorumunu görürsün.</li>
+        </ul>
+
+        <h3>7) Kuantum Gürültüsü (Decoherence) ve Kalkan</h3>
+        <ul>
+          <li>Kırmızı parçacıklar çevresel gürültüdür.</li>
+          <li>Parçacık yaklaşınca qubit’e stokastik bir bozulma kanalı uygulanır: faz bozunumu (dephasing) + genlik sönümü (amplitude damping).</li>
+          <li>Fare ile qubit’in üstüne gelirsen mavi <code>Kalkan</code> çıkar; kalkan varken çarpışmalar yok sayılır.</li>
+        </ul>
+
+        <h3>10) Seed / Reset / Event Log</h3>
+        <ul>
+          <li><code>Seed</code>: Rastgeleliği deterministik yapmak için seed gir. Aynı seed ile aynı ölçüm sonuçlarını tekrar üretirsin.</li>
+          <li><code>Reset</code>: Register’ı <code>|00…0⟩</code> başlangıcına döndürür.</li>
+          <li><code>Event Log</code>: Uygulanan kapılar, oracle seçimi, ölçümler ve decoherence olayları burada görünür.</li>
+        </ul>
+
+        <h3>8) Sandbox Modu</h3>
+        <ul>
+          <li><code>Sandbox</code> aç: öğretici kontroller kapanır, devre kurma moduna geçersin.</li>
+          <li>Araç kutusundan <code>Qubit</code> &sol; <code>H</code> &sol; <code>X</code> &sol; <code>Z</code> &sol; <code>C-X</code> öğelerini devre alanına sürükle.</li>
+          <li>Adımlarda hedef qubit’i (ve Z için açıyı) seç.</li>
+          <li><code>Devreyi Çalıştır</code> adımları sırayla uygular.</li>
+        </ul>
+
+        <h3>9) Paylaş / Yükle</h3>
+        <ul>
+          <li><code>Paylaş</code> state’i JSON olarak üretir ve panoya kopyalamayı dener.</li>
+          <li>JSON’u başka bir yere yapıştırıp saklayabilirsin.</li>
+          <li><code>Yükle</code> ile JSON’u geri içeri alıp sahneyi/devreyi geri kurabilirsin.</li>
+        </ul>
+
+        <p>İpucu: Menü açıkken <code>ESC</code> ile kapatabilirsin. Dışarı tıklamak da menüyü kapatır.</p>
+      </div>
+    </aside>
+    <div id="ui">
+      <div class="row" style="margin-bottom: 8px;">
+        <label for="seedInput">Seed</label>
+        <div style="flex: 1"></div>
+        <input id="seedInput" type="text" value="cern" style="width: 140px; background: rgba(0,0,0,0.22); color: rgba(255,255,255,0.95); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 8px 10px;" />
+        <button id="btnReset" type="button" style="padding: 8px 10px;">Reset</button>
+      </div>
+      <div class="row">
+        <label for="activeQubit">Aktif</label>
+        <div style="flex: 1"></div>
+        <select id="activeQubit">
+          <option value="A">A</option>
+          <option value="B">B</option>
+        </select>
+      </div>
+      <div class="row">
+        <button id="btnH" type="button">H</button>
+        <button id="btnX" type="button">X</button>
+      </div>
+      <div class="row" style="margin-bottom: 6px;">
+        <label for="zSlider">Z</label>
+        <div style="flex: 1"></div>
+        <div id="zValue">0°</div>
+      </div>
+      <input id="zSlider" type="range" min="0" max="360" value="0" step="1" />
+
+      <div class="row" style="margin-top: 10px;">
+        <button id="btnCX" type="button">C-X</button>
+        <select id="cxControl">
+          <option value="A">Kontrol: A</option>
+          <option value="B">Kontrol: B</option>
+        </select>
+      </div>
+      <div class="row">
+        <div style="flex: 1"></div>
+        <select id="cxTarget">
+          <option value="B">Hedef: B</option>
+          <option value="A">Hedef: A</option>
+        </select>
+      </div>
+
+      <div class="row" style="margin-top: 10px;">
+        <button id="btnBell" type="button" style="width: 100%;">Dolaşıklık Yarat</button>
+      </div>
+
+      <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12);">
+        <div style="font-size: 12px; opacity: 0.85; margin-bottom: 8px;">Gizemli Kutu</div>
+        <div class="row" style="flex-wrap: wrap; gap: 8px;">
+          <button id="box1" type="button" style="flex: 1; min-width: 90px;">Kutu 1</button>
+          <button id="box2" type="button" style="flex: 1; min-width: 90px;">Kutu 2</button>
+        </div>
+        <div class="row" style="flex-wrap: wrap; gap: 8px;">
+          <button id="box3" type="button" style="flex: 1; min-width: 90px;">Kutu 3</button>
+          <button id="box4" type="button" style="flex: 1; min-width: 90px;">Kutu 4</button>
+        </div>
+        <div class="row" style="margin-top: 8px;">
+          <button id="btnDeutsch" type="button" style="width: 100%; padding: 12px 14px;">Kuantum Sorgusu Yap</button>
+        </div>
+        <div id="deutschResult" style="margin-top: 8px; font-size: 20px; font-weight: 800; letter-spacing: 0.5px;">—</div>
+        <div id="deutschHint" style="font-size: 12px; opacity: 0.85; line-height: 1.25;">
+          Eğer sonuç SİYAH (0) ise, kutu SABİTtir. Eğer sonuç BEYAZ (1) ise, kutu DENGELİdir.
+        </div>
+      </div>
+
+      <div id="status" style="font-size: 12px; opacity: 0.8; line-height: 1.2;">Hazır</div>
+      <div style="margin-top: 8px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.12);">
+        <div style="font-size: 12px; opacity: 0.85; margin-bottom: 8px;">Event Log</div>
+        <div id="eventLog" style="max-height: 120px; overflow: auto; font-size: 11px; line-height: 1.35; opacity: 0.92;">
+          <div style="opacity: 0.75;">—</div>
+        </div>
+      </div>
+
+      <div id="sandbox">
+        <div class="row" style="margin-bottom: 6px;">
+          <label for="sandboxToggle">Sandbox</label>
+          <div style="flex: 1"></div>
+          <input id="sandboxToggle" type="checkbox" />
+        </div>
+
+        <div id="sandboxBody" style="display: none;">
+          <div style="font-size: 12px; opacity: 0.85; margin-bottom: 8px;">Araç Kutusu</div>
+          <div class="row" style="flex-wrap: wrap; gap: 8px;">
+            <div class="pill" draggable="true" data-tool="Q">Qubit</div>
+            <div class="pill" draggable="true" data-tool="H">H</div>
+            <div class="pill" draggable="true" data-tool="X">X</div>
+            <div class="pill" draggable="true" data-tool="Z">Z</div>
+            <div class="pill" draggable="true" data-tool="CX">C-X</div>
+          </div>
+
+          <div style="margin-top: 10px; font-size: 12px; opacity: 0.85;">Devre Alanı</div>
+          <div id="circuitArea">Buraya sürükle-bırak</div>
+
+          <div id="steps"></div>
+
+          <div id="sandboxControls" class="row" style="margin-top: 10px;">
+            <button id="btnRunCircuit" type="button">Devreyi Çalıştır</button>
+            <button id="btnClearCircuit" type="button">Temizle</button>
+          </div>
+
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12);">
+            <div style="font-size: 12px; opacity: 0.85; margin-bottom: 8px;">Görsel Ayarlar</div>
+            <div class="row" style="gap: 8px;">
+              <div style="flex: 1;">
+                <label>Renk A</label>
+                <input id="colorA" type="color" value="#1a237e" />
+              </div>
+              <div style="flex: 1;">
+                <label>Renk B</label>
+                <input id="colorB" type="color" value="#4a148c" />
+              </div>
+            </div>
+            <div class="row" style="gap: 8px;">
+              <div style="flex: 1;">
+                <label>Fresnel</label>
+                <input id="colorF" type="color" value="#29b6f6" />
+              </div>
+              <div style="flex: 1;">
+                <label>Arkaplan</label>
+                <input id="colorBg" type="color" value="#000000" />
+              </div>
+            </div>
+            <div class="row" style="margin-bottom: 6px;">
+              <label for="lineOpacity">Bağ Opaklık</label>
+              <div style="flex: 1"></div>
+              <div id="lineOpacityValue">0.28</div>
+            </div>
+            <input id="lineOpacity" type="range" min="0" max="1" value="0.28" step="0.01" />
+          </div>
+
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12);">
+            <div style="font-size: 12px; opacity: 0.85; margin-bottom: 8px;">Paylaş / Yükle</div>
+            <div class="row">
+              <button id="btnShare" type="button" style="width: 100%;">Paylaş (Kopyala)</button>
+            </div>
+            <textarea id="shareText" placeholder="State burada görünecek / buraya yapıştırıp yükle"></textarea>
+            <div class="row">
+              <button id="btnLoad" type="button" style="width: 100%;">Yükle</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
